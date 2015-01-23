@@ -10,7 +10,7 @@ import com.aliyun.odps.mapred.conf.JobConf;
 public class JobContextImpl implements JobContext {
     private static final Log LOG = LogFactory.getLog(JobContextImpl.class);
     
-    private JobConf conf = null;
+    public JobConf conf = null;
     
     JobContextImpl(JobConf jc) {
         conf = jc;
@@ -46,7 +46,7 @@ public class JobContextImpl implements JobContext {
     }
     
     public String[] getGroupingColumns() {
-        return null;
+        return conf.getOutputGroupingColumns();
     }
 }
 
