@@ -13,6 +13,7 @@ import com.aliyun.odps.data.TableInfo;
 import com.aliyun.odps.mapred.conf.JobConf;
 import com.aliyun.odps.counter.Counter;
 import com.aliyun.odps.data.ArrayRecord;
+import com.aliyun.odps.data.MyRecord;
 import com.aliyun.odps.OdpsType;
 
 import java.util.HashMap;
@@ -23,6 +24,8 @@ import java.util.Comparator;
 import java.util.Map;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
+import java.lang.reflect.Method;
+import java.util.Iterator;
 
 import java.lang.instrument.Instrumentation;
 
@@ -30,7 +33,7 @@ public class MapperTaskContextImpl extends TaskContextImpl implements Mapper.Tas
     private static final Log LOG = LogFactory.getLog(MapperTaskContextImpl.class);
     private static int maxNum = 50000;
     public static int numMapOutput = 0;
-    public static HashMap<Record, List<Record>> mapOutputRecords = new HashMap<Record, List<Record>>();
+    public static HashMap<MyRecord, List<Record>> mapOutputRecords = new HashMap<MyRecord, List<Record>>();
     MapperTaskContextImpl(JobConf jc) {
         super(jc);
     }
@@ -52,15 +55,41 @@ public class MapperTaskContextImpl extends TaskContextImpl implements Mapper.Tas
     }
     
     public void combineRecords() {
-        
+        Class combiner = conf.getCombinerClass();
+        Reducer.TaskContext combinerContext = (Reducer.TaskContext) new ReducerTaskContextImpl(conf);
+        try {
+            Reducer combinerInstance = (Reducer) combiner.newInstance();
+            Method combinerSetup = combiner.getMethod("setup", Reducer.TaskContext.class);
+            combinerSetup.invoke(combinerInstance, combinerContext);
+            
+            Method reduce = combiner.getMethod("reduce", Record.class, Iterator.class, Reducer.TaskContext.class);
+            Iterator iter = mapOutputRecords.entrySet().iterator();
+            while(iter.hasNext()) {
+                Map.Entry e = (Map.Entry) iter.next();
+                LOG.info("key-------------" + ((Record)e.getKey()).get(0));
+                reduce.invoke(combinerInstance, e.getKey(), ((List<Record>)e.getValue()).iterator(), combinerContext);
+            }
+            iter = mapOutputRecords.entrySet().iterator();
+            while(iter.hasNext()) {
+                Map.Entry e = (Map.Entry) iter.next();
+                Record key = (Record)e.getKey();
+                List<Record> value = (List<Record>)e.getValue();
+                LOG.info("key===== " + key.get(0));
+                for(Record i: value) {
+                    LOG.info(i);
+                }
+            }
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
     }
     
     public void output() {
         numMapOutput++;
-        List<Map.Entry<Record, List<Record>>> lt = new ArrayList<Map.Entry<Record, List<Record>>>(mapOutputRecords.entrySet());
+        List<Map.Entry<MyRecord, List<Record>>> lt = new ArrayList<Map.Entry<MyRecord, List<Record>>>(mapOutputRecords.entrySet());
         mapOutputRecords.clear();
-        Collections.sort(lt, new Comparator<Map.Entry<Record, List<Record>>>() {
-            public int compare(Map.Entry<Record, List<Record>> x, Map.Entry<Record, List<Record>> y) {
+        Collections.sort(lt, new Comparator<Map.Entry<MyRecord, List<Record>>>() {
+            public int compare(Map.Entry<MyRecord, List<Record>> x, Map.Entry<MyRecord, List<Record>> y) {
                 return ((String) x.getKey().get(0)).compareTo((String) y.getKey().get(0));
             }
         });
@@ -68,7 +97,7 @@ public class MapperTaskContextImpl extends TaskContextImpl implements Mapper.Tas
             BufferedWriter bw = new BufferedWriter(new FileWriter("output_"+numMapOutput));
             int len = lt.size();
             for(int i = 0; i < len; ++i) {
-                Map.Entry<Record, List<Record>> now = lt.get(i);
+                Map.Entry<MyRecord, List<Record>> now = lt.get(i);
                 List<Record> lr = now.getValue();
                 int len1 = lr.size();
                 for(int j = 0; j < len1; ++j) {
@@ -83,8 +112,8 @@ public class MapperTaskContextImpl extends TaskContextImpl implements Mapper.Tas
     }
     
     public void write(Record key, Record value) throws IOException {
-        //LOG.info(key.get(0) + " "+value.get(0));
-        Record newKey = new ArrayRecord(key.getColumns());
+        LOG.info("key=" + key.get(0) + " "+"value="+value.get(0));
+        MyRecord newKey = new MyRecord(key.getColumns());
         newKey.set(key.toArray());
         if(!mapOutputRecords.containsKey(newKey)) {
             // calculate size
@@ -95,6 +124,7 @@ public class MapperTaskContextImpl extends TaskContextImpl implements Mapper.Tas
             LOG.info("has key");
             ArrayList<Record> al = (ArrayList<Record>) mapOutputRecords.get(newKey);
             al.add(value);
+            LOG.info(al);
         }
         if(mapOutputRecords.size() == maxNum) {// call Combiner
             combineRecords();

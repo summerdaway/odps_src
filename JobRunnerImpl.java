@@ -19,7 +19,6 @@ import com.aliyun.odps.OdpsType;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map.Entry;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -89,6 +88,7 @@ public class JobRunnerImpl extends Configured implements JobRunner {
                 ar.set(s);
                 mapperMap.invoke(mapperInstance, recordNum, ar, mapperContext);
             }
+            ((MapperTaskContextImpl)mapperContext).combineRecords();
             ((MapperTaskContextImpl)mapperContext).output();
         } catch(Exception e) {
             e.printStackTrace();
