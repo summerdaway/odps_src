@@ -47,15 +47,11 @@ public class TaskContextImpl extends JobContextImpl implements TaskContext {
     }
     
     public Record createMapOutputKeyRecord() throws IOException {
-        LOG.info("createMapOutputKeyRecord");
         return new ArrayRecord(conf.getMapOutputKeySchema());
     }
     
     public Record createMapOutputValueRecord() throws IOException {
-        LOG.info(conf.getMapOutputKeySchema());
         Column[] c = conf.getMapOutputValueSchema();
-        LOG.info(c.length);
-        LOG.info(c[0].getName());
         return new ArrayRecord(conf.getMapOutputValueSchema());
     }
     

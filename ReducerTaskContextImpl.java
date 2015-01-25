@@ -14,6 +14,7 @@ import com.aliyun.odps.mapred.conf.JobConf;
 import com.aliyun.odps.counter.Counter;
 import com.aliyun.odps.data.ArrayRecord;
 import com.aliyun.odps.OdpsType;
+import com.aliyun.odps.mapred.utils.OutputUtils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -33,8 +34,9 @@ public class ReducerTaskContextImpl extends TaskContextImpl implements Reducer.T
     
     ReducerTaskContextImpl(JobConf jc) {
         super(jc);
+        TableInfo[] outputTable = OutputUtils.getTables(conf);
         try {
-            bw = new BufferedWriter(new FileWriter("ans"));
+            bw = new BufferedWriter(new FileWriter(outputTable[0].toString()));
         } catch(Exception e) {
             e.printStackTrace();
         }
@@ -53,20 +55,17 @@ public class ReducerTaskContextImpl extends TaskContextImpl implements Reducer.T
     }
     
     public void write(Record r) throws IOException {
-        LOG.info(r.get(0)+","+r.get(1));
         bw.write(r.get(0)+","+r.get(1)+"\n");
         bw.flush();
     }
     
     
     public void write(Record key, Record value) throws IOException {
-        //LOG.info(key.get(0) + " "+value.get(0));
         List<Record> val = (List<Record>) MapperTaskContextImpl.mapOutputRecords.get(key);
         val.clear();
         ArrayRecord ar = new ArrayRecord(value.getColumns());
         ar.set(value.toArray());
         val.add(ar);
-        LOG.info(val);
     }
 }
 

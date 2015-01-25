@@ -18,6 +18,7 @@ import com.aliyun.odps.OdpsType;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.io.BufferedWriter;
@@ -55,12 +56,7 @@ public class JobRunnerImpl extends Configured implements JobRunner {
     
     public RunningJob submit() throws OdpsException {
         JobConf conf = (JobConf) this.getConf();
-        LOG.info(conf.getMapperClass().getClass());
-        LOG.info(conf.getReducerClass());
-        LOG.info(conf.getMemoryForMapTask());
-        LOG.info(conf.getNumMapTasks());
-        LOG.info(conf.getNumReduceTasks());
-        LOG.info(conf.getCombinerClass()+"aaaaa");
+        LOG.info("Job start");
         Mapper.TaskContext mapperContext = (Mapper.TaskContext) new MapperTaskContextImpl(conf);
         Class mapper = conf.getMapperClass();
         Mapper mapperInstance = null;
@@ -76,6 +72,10 @@ public class JobRunnerImpl extends Configured implements JobRunner {
             Method mapperMap = mapper.getMethod("map", long.class, Record.class, Mapper.TaskContext.class);
             long recordNum = 0;
             String buf;
+            LOG.info("Map 0%");
+            long totalLength = (new File(inputTable[0].toString())).length();
+            long nowLength = 0;
+            long beforeLength = 0;
             while((buf = bf.readLine()) != null) {
                 String[] s = buf.split(",");
                 ++recordNum;
@@ -87,6 +87,11 @@ public class JobRunnerImpl extends Configured implements JobRunner {
                 ArrayRecord ar = new ArrayRecord(c);
                 ar.set(s);
                 mapperMap.invoke(mapperInstance, recordNum, ar, mapperContext);
+                nowLength += buf.length();
+                if((nowLength - beforeLength) >= 0.05*totalLength) {
+                    beforeLength = nowLength;
+                    LOG.info("Map " + (100.0*nowLength/totalLength) + "%");
+                }
             }
             ((MapperTaskContextImpl)mapperContext).combineRecords();
             ((MapperTaskContextImpl)mapperContext).output();
@@ -94,6 +99,7 @@ public class JobRunnerImpl extends Configured implements JobRunner {
             e.printStackTrace();
         }
         
+        LOG.info("Shuffle start");
         // Reduce
         String[] fileNames = new String[MapperTaskContextImpl.numMapOutput];
         for(int i = 0; i < MapperTaskContextImpl.numMapOutput; ++i) {
@@ -105,6 +111,7 @@ public class JobRunnerImpl extends Configured implements JobRunner {
         } catch(Exception e) {
             e.printStackTrace();
         }
+        LOG.info("Reduce start");
         Class reducer = conf.getReducerClass();
         Reducer.TaskContext reducerContext = (Reducer.TaskContext) new ReducerTaskContextImpl(conf);
         try {
@@ -190,7 +197,7 @@ public class JobRunnerImpl extends Configured implements JobRunner {
         long m1 = Runtime.getRuntime().freeMemory();
         LOG.info("total: " + total + " free: " + m1);
          */
-        return null;
+        return new RunningJobImpl(conf);
     }
 }
 

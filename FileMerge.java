@@ -45,13 +45,13 @@ public class FileMerge {
 			Record r = priorityQueue.poll();
 			//System.out.println(r.s);
             bw.write(r.s+"\n");
+            bw.flush();
             //bw.flush();
 			String s = b[r.i].readLine();
 			if (s != null) {
 				priorityQueue.add(new Record(s, r.i));
 			}
 		}
-        bw.flush();
 	}
 	
 	public static void main(String[] argc) throws IOException {

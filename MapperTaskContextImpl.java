@@ -66,18 +66,7 @@ public class MapperTaskContextImpl extends TaskContextImpl implements Mapper.Tas
             Iterator iter = mapOutputRecords.entrySet().iterator();
             while(iter.hasNext()) {
                 Map.Entry e = (Map.Entry) iter.next();
-                LOG.info("key-------------" + ((Record)e.getKey()).get(0));
                 reduce.invoke(combinerInstance, e.getKey(), ((List<Record>)e.getValue()).iterator(), combinerContext);
-            }
-            iter = mapOutputRecords.entrySet().iterator();
-            while(iter.hasNext()) {
-                Map.Entry e = (Map.Entry) iter.next();
-                Record key = (Record)e.getKey();
-                List<Record> value = (List<Record>)e.getValue();
-                LOG.info("key===== " + key.get(0));
-                for(Record i: value) {
-                    LOG.info(i);
-                }
             }
         } catch(Exception e) {
             e.printStackTrace();
@@ -112,7 +101,6 @@ public class MapperTaskContextImpl extends TaskContextImpl implements Mapper.Tas
     }
     
     public void write(Record key, Record value) throws IOException {
-        LOG.info("key=" + key.get(0) + " "+"value="+value.get(0));
         MyRecord newKey = new MyRecord(key.getColumns());
         newKey.set(key.toArray());
         if(!mapOutputRecords.containsKey(newKey)) {
@@ -121,17 +109,15 @@ public class MapperTaskContextImpl extends TaskContextImpl implements Mapper.Tas
             al.add(value);
             mapOutputRecords.put(newKey, al);
         } else {
-            LOG.info("has key");
             ArrayList<Record> al = (ArrayList<Record>) mapOutputRecords.get(newKey);
             al.add(value);
-            LOG.info(al);
         }
         if(mapOutputRecords.size() == maxNum) {// call Combiner
             combineRecords();
         }
         long freeMemory = Runtime.getRuntime().freeMemory();
         long totalMemory = Runtime.getRuntime().maxMemory();
-        if(freeMemory < totalMemory*0.7 && mapOutputRecords.size() > (maxNum>>1)) {
+        if((freeMemory < totalMemory*0.5) || (freeMemory < totalMemory*0.7 && mapOutputRecords.size() > (maxNum>>1))) {
             output();
         }
     }
